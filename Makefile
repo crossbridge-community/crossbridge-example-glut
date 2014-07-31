@@ -28,45 +28,10 @@
 
 .PHONY: init clean all 
 
-$?VGL_TARGETS=	02_matrices_and_coloring_polygons \
-	03_the_viewport \
-	04_scrolling_and_the_matrix_stack \
-	05_texture_mapping_and_pixel_manipulation \
-	06_loading_a_texture \
-	07_clipping_textures \
-	08_non_power_of_2_textures \
-	09_updating_textures \
-	10_color_keying_and_blending \
-	11_stretching_and_filters \
-	12_rotation \
-	13_matrix_transformations \
-	14_repeating_textures \
-	15_extensions_and_glew \
-	16_vertex_arrays \
-	17_vertex_buffer_objects \
-	18_textured_vertex_buffers \
-	19_sprite_sheets \
-	20_bitmap_fonts \
-	21_alpha_textures \
-	22_texture_blitting_and_texture_padding \
-	23_freetype_fonts \
-	24_text_alignment \
-	25_transforming_text \
-	26_the_stencil_buffer \
-	27_frame_buffer_objects_and_render_to_texture \
-	28_antialiasing_and_multisampling \
-	29_hello_glsl \
-	30_loading_text_file_shaders \
-	31_glsl_matrices_color_and_uniforms \
-	32_glm_matrices \
-	33_multi-color_polygons_and_attributes \
-	34_glsl_texturing \
-	35_glsl_font \
-	36_vertex_array_objects
-
+$?VGL_TARGETS=	lesson02 lesson03 lesson04 lesson05 lesson06 lesson07 lesson08 lesson09 lesson10 lesson11 lesson12 lesson13 lesson21 lesson22 lesson23 lesson24 lesson25 lesson32 lesson36 lesson37 lesson40 lesson41 lesson42 lesson43 lesson45 lesson47 
+ 
 all: clean init check $(VGL_TARGETS)
  
-#@curl -L -o $@.zip http://lazyfoo.net/tutorials/OpenGL/$@/$@.zip && mv $@.zip temp/ && unzip -qq temp/$@.zip && mv $@ lessons
 %:
 	# Generate VFS
 	@rm -rf lessons/$@/temp/
