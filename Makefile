@@ -70,7 +70,7 @@ all: clean init check $(VGL_TARGETS)
 	#"$(FLASCC)/usr/bin/g++" -O4 -c lessons/$@/$@.cpp
 	#"$(FLASCC)/usr/bin/nm" $@.o | grep " T " | awk '{print $$3}' | sed 's/__/_/' >> exports-$@.txt 
 	# Generate Main.SWF
-	"$(FLASCC)/usr/bin/g++" $(BASE_CFLAGS) $(wildcard lessons/$@/*.cpp) $(wildcard lessons/$@/*.c) $(GLS3D)/install/usr/lib/libGL.abc lessons/$@/myfs.abc -symbol-abc=lessons/$@/Console.abc \
+	"$(FLASCC)/usr/bin/gcc" $(BASE_CFLAGS) $(wildcard lessons/$@/*.cpp) $(wildcard lessons/$@/*.c) $(GLS3D)/install/usr/lib/libGL.abc lessons/$@/myfs.abc -symbol-abc=lessons/$@/Console.abc \
 		-I$(GLS3D)/install/usr/include/ -L$(GLS3D)/install/usr/lib/ \
 		-I$(FLASCC)/../samples/Example_freeglut/install/usr/include/ -L$(FLASCC)/../samples/Example_freeglut/install/usr/lib/ \
 		-lSDL -lSDL_image -lSDL_mixer -lSDL_ttf -lglut -lGL -lvgl -lfreetype -lvorbis -logg -lwebp -ltiff -lpng -lz -ljpeg -lm  \

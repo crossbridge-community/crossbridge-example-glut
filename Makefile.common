@@ -56,7 +56,7 @@ endif
 $?GLS3D=$(FLASCC)/../samples/Example_GLS3D
 
 # C/CPP Compiler
-$?BASE_CFLAGS=-Werror -Wno-write-strings -Wno-trigraphs
+$?BASE_CFLAGS=-Wno-write-strings -Wno-trigraphs
 $?EXTRACFLAGS=
 $?OPT_CFLAGS=-O4
 
