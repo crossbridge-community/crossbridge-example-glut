@@ -7,5 +7,7 @@
 *.ipr
 *.iml
 *.iws
+embed_*.as
+embed.rules
 temp/
 bin/

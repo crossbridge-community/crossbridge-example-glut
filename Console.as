@@ -1,309 +1,333 @@
-package com.adobe.flascc {
-import flash.display.Bitmap;
-import flash.display.BitmapData;
-import flash.display.DisplayObjectContainer;
-import flash.display.Sprite;
-import flash.display.Stage3D;
-import flash.display.StageAlign;
-import flash.display.StageScaleMode;
-import flash.display3D.Context3D;
-import flash.display3D.Context3DRenderMode;
-import flash.events.Event;
-import flash.events.KeyboardEvent;
-import flash.events.MouseEvent;
-import flash.events.SampleDataEvent;
-import flash.geom.Rectangle;
-import flash.media.Sound;
-import flash.media.SoundChannel;
-import flash.text.TextField;
-import flash.utils.ByteArray;
+/*
+** ADOBE SYSTEMS INCORPORATED
+** Copyright 2012 Adobe Systems Incorporated. All Rights Reserved.
+**
+** NOTICE:  Adobe permits you to use, modify, and distribute this file in
+** accordance with the terms of the Adobe license agreement accompanying it.
+** If you have received this file from a source other than Adobe, then your use,
+** modification, or distribution of it requires the prior written permission of Adobe.
+*/
 
-import com.adobe.flascc.*;
-import com.adobe.flascc.vfs.*;
-import GLS3D.GLAPI;
+package com.adobe.flascc
+{
+  import flash.display.Bitmap;
+  import flash.display.BitmapData;
+  import flash.display.DisplayObjectContainer;
+  import flash.display.Loader;
+  import flash.display.Sprite;
+  import flash.display.Stage3D;
+  import flash.display.StageAlign;
+  import flash.display.StageScaleMode;
+  import flash.display3D.Context3D;
+  import flash.display3D.Context3DRenderMode;
+  import flash.events.AsyncErrorEvent;
+  import flash.events.Event;
+  import flash.events.EventDispatcher;
+  import flash.events.IOErrorEvent;
+  import flash.events.KeyboardEvent;
+  import flash.events.MouseEvent;
+  import flash.events.ProgressEvent;
+  import flash.events.SampleDataEvent;
+  import flash.events.SecurityErrorEvent;
+  import flash.geom.Rectangle;
+  import flash.media.Sound;
+  import flash.media.SoundChannel;
+  import flash.net.LocalConnection;
+  import flash.net.URLLoader;
+  import flash.net.URLLoaderDataFormat;
+  import flash.net.URLRequest;
+  import flash.text.TextField;
+  import flash.ui.Mouse;
+  import flash.utils.ByteArray
+  import flash.utils.ByteArray;
+  import flash.utils.Endian;
+  import flash.utils.getTimer;
+  
+  import GLS3D.GLAPI;
+  import com.adobe.flascc.*;
+  import com.adobe.flascc.vfs.*;
 
-public class Console extends Sprite implements ISpecialFile {
-    // CORE
-    private var _frameCounter:TextField;
-    private var _textField:TextField;
-    private var _mainloopTickPtr:int;
-    private var _inputContainer;
-    // STAGE3D
-    private var _stage3D:Stage3D;
-    private var _context3D:Context3D;
-    // BLITTING
-    private var _bitmapData:BitmapData;
-    private var _bitmap:Bitmap;
-    private var _bitmapRectangle:Rectangle;
-    // VFS
-    private var _fs:InMemoryBackingStore;
-    // FLAGS
-    private var _isRendered:Boolean;
-    private var _isInitialized:Boolean;
+  /**
+  * A basic implementation of a console for FlasCC apps.
+  * The PlayerKernel class delegates to this for things like read/write
+  * so that console output can be displayed in a TextField on the Stage.
+  */
+  public class Console extends Sprite implements ISpecialFile
+  {
+    private var enableConsole:Boolean = false;
+    private static var _width:int = 500;
+    private static var _height:int = 500;
+    private var mainloopTickPtr:int, keyHandlerPtr:int;
+    private var _tf:TextField;
+    private var inputContainer
+    private var keybytes:ByteArray = new ByteArray()
+    private var mx:int = 0, my:int = 0, last_mx:int = 0, last_my:int = 0, button:int = 0, kp:int = 0;
+    private var snd:Sound = null
+    private var sndChan:SoundChannel = null
+    public var sndDataBuffer:ByteArray = null
+    private var _stage:Stage3D;
+    private var _context:Context3D;
+    private var rendered:Boolean = false;
+    private var datazip:URLLoader;
 
-    private var _useStage3D:Boolean = true;
-    private var _useBlitting:Boolean = !_useStage3D;
-    // INPUT
-    private var _keyBA:ByteArray = new ByteArray()
-    private var _keyX:int = 0;
-    private var _keyY:int = 0;
-    // SOUND
-    private var _soundBuffer:ByteArray;
-    private var _soundPos:int = 0;
-    private var _sound:Sound = null;
-    private var _soundChannel:SoundChannel;
-    // DISPLAY
-    private var _frameCount:int;
-    private var _vglttyargs:Vector.<int> = new Vector.<int>();
-    private var _vbuffer:int;
-    private var _vgl_mx:int;
-    private var _vgl_my:int;
-    private var _kp:int;
-    // ISpecialFile
-    public var exitHook:Function;
-    // CONSTS
-    private const EMPTY_VECTOR:Vector.<int> = new Vector.<int>();
+    /**
+    * To Support the preloader case you might want to have the Console
+    * act as a child of some other DisplayObjectContainer.
+    */
+    public function Console(container:DisplayObjectContainer = null)
+    {
+      CModule.rootSprite = container ? container.root : this
 
-    // CONSTRUCTOR
-
-    public function Console(container:DisplayObjectContainer = null) {
-        CModule.rootSprite = container ? container.root : this;
-        if (CModule.runningAsWorker()) {
-            return;
-        }
-        if (container) {
-            container.addChild(this);
-            onAdded(null);
-        } else {
-            addEventListener(Event.ADDED_TO_STAGE, onAdded);
-        }
+      if(CModule.runningAsWorker()) {
+        return;
+      }
+      
+      if(container) {
+        container.addChild(this)
+        init(null)
+      } else {
+        addEventListener(Event.ADDED_TO_STAGE, init)
+      }
     }
 
-    // EVENT HANDLERS
-
-    private function onAdded(e:Event):void {
-        log("onAdded");
-        // STAGE
-        stage.frameRate = 60;
-        stage.align = StageAlign.TOP_LEFT;
-        stage.scaleMode = StageScaleMode.NO_SCALE;
-        // STAGE3d
-        _stage3D = stage.stage3Ds[0];
-        _stage3D.addEventListener(Event.CONTEXT3D_CREATE, onContextCreated);
-        _stage3D.requestContext3D(Context3DRenderMode.AUTO);
+    private function onComplete(e:Event):void
+    {
+      init(null)
     }
 
-    private function createChildren():void {
-        log("createChildren");
-        // ROOT
-        _inputContainer = new Sprite()
-        addChild(_inputContainer);
-        // BLITTING
-        if(_useBlitting) {
-            _bitmapData = new BitmapData(800, 600, false);
-            _bitmap = new Bitmap(_bitmapData);
-            _bitmapRectangle = new Rectangle(0, 0, _bitmapData.width, _bitmapData.height);
-            _bitmapData.fillRect(_bitmapData.rect, 0);
-            _inputContainer.addChild(_bitmap);
-        }
-        // LOGGING
-        _textField = new TextField;
-        _textField.multiline = true;
-        _textField.selectable = false;
-        _textField.width = 800;
-        _textField.height = 600;
-        _textField.textColor = 0x666666;
-        _inputContainer.addChild(_textField);
-        _textField.border = true;
-        // FRAME COUNTER
-        _frameCounter = new TextField;
-        _frameCounter.width = 40;
-        _frameCounter.height = 20;
-        _frameCounter.textColor = 0x666666;
-        _frameCounter.x = 760;
-        _inputContainer.addChild(_frameCounter);
+    public function send(value:String):void
+    {
+        trace(value)
     }
 
-    private function onContextCreated(event:Event):void {
-        log("onContextCreated");
-
-        createChildren();
-
-        if(_useStage3D) {
-            _context3D = _stage3D.context3D
-            _context3D.configureBackBuffer(stage.stageWidth, stage.stageHeight, 2, true /*enableDepthAndStencil*/)
-            _context3D.enableErrorChecking = true;
-            log("Stage3D context: " + _context3D.driverInfo);
-            if (_context3D.driverInfo.indexOf("Software") != -1) {
-                log("Software mode unsupported...");
-                return;
-            }
-            GLAPI.init(_context3D, null, stage);
-            var gl:GLAPI = GLAPI.instance;
-            gl.context.clear(0, 0, 0);
-            gl.context.present();
-        }
-
-        // file system
-        CModule.vfs.console = this;
-        _fs = new myfs();
-        CModule.vfs.addBackingStore(_fs, null);
-
-        // starting c code
-        CModule.startAsync(this, new <String>["/main.swf"]);
-
-        // VIDEO
-        _vbuffer = CModule.getPublicSymbol("__avm2_vgl_argb_buffer");
-        _vgl_mx = CModule.getPublicSymbol("vgl_cur_mx");
-        _vgl_my = CModule.getPublicSymbol("vgl_cur_my");
-
-        // INPUT
-        stage.addEventListener(KeyboardEvent.KEY_DOWN, onBufferKeyDown);
-        stage.addEventListener(KeyboardEvent.KEY_UP, onBufferKeyUp);
-        stage.addEventListener(MouseEvent.MOUSE_MOVE, onBufferMouseMove);
-        stage.addEventListener (Event.ENTER_FRAME, onFrameEnter);
-        stage.addEventListener(Event.RESIZE, onStageResized);
-        //onFrameEnter(null);
+    private function onError(e:Event):void
+    {
     }
 
-    private function initialize():void {
-        log("initialize");
-        _isInitialized = true;
-        _mainloopTickPtr = CModule.getPublicSymbol("_Z4drawv");
-
-        _sound = new Sound();
-        _sound.addEventListener( SampleDataEvent.SAMPLE_DATA, onSoundData);
-        _soundPos = 0;
-        _soundChannel = _sound.play()
-        _soundChannel.addEventListener(Event.SOUND_COMPLETE, onSoundComplete);
-
-
-    }
-
-    private function onFrameEnter(event:Event):void {
-        if (!_isInitialized) {
-            initialize();
-        }
-       // CModule.serviceUIRequests();
-        CModule.write32(_vgl_mx, _keyX);
-        CModule.write32(_vgl_my, _keyY);
-        if(_useStage3D) {
-            GLAPI.instance.context.clear(1, 1, 1);
-            CModule.callI(_mainloopTickPtr, EMPTY_VECTOR);
-            GLAPI.instance.context.present();
-        }
-        if(_useBlitting) {
-            var ram:ByteArray = CModule.ram;
-            ram.position = CModule.read32(_vbuffer)
-            if (ram.position != 0) {
-                _frameCount++;
-                _frameCounter.text = String(_frameCount);
-                _bitmapData.setPixels(_bitmapRectangle, ram)
-            }
-        }
-    }
-
-    private function onStageResized(event:Event):void {
-        log("onStageResized");
-        // need to reconfigure back buffer
-        _context3D.configureBackBuffer(stage.stageWidth, stage.stageHeight, 2, true /*enableDepthAndStencil*/)
-    }
-
-    private function onError(event:Event):void {
-        log(event.toString());
-    }
-
-    // Keyboard
-
-    public function onBufferMouseMove(event:MouseEvent) {
-        event.stopPropagation();
-        _keyX = event.stageX;
-        _keyY = event.stageY;
-    }
-
-    public function onBufferKeyDown(event:KeyboardEvent) {
-        _keyBA.writeByte(int(event.keyCode & 0x7F));
-    }
-
-    public function onBufferKeyUp(event:KeyboardEvent) {
-        _keyBA.writeByte(int(event.keyCode | 0x80));
-    }
-
-    // Sound
-
-    public function onSoundComplete(e:Event):void {
-        _soundChannel.removeEventListener(Event.SOUND_COMPLETE, onSoundComplete)
-        _soundChannel = _sound.play()
-        _soundChannel.addEventListener(Event.SOUND_COMPLETE, onSoundComplete)
-    }
-
-    public function onSoundData(event:SampleDataEvent):void {
-        event.data.length = 0
-        _soundBuffer = event.data
-
-         if(_frameCount == 0)
-            return;
-
-        /* if(engineticksoundptr == 0)
-         engineticksoundptr = CModule.getPublicSymbol("engineTickSound")
-
-         if(engineticksoundptr)
-         CModule.callI(engineticksoundptr, emptyArgs)*/
-    }
-
-    // ISpecialFile
-
-    public function exit(code:int):Boolean {
-        // default to unhandled
-        return exitHook ? exitHook(code) : false;
-    }
-
-    public function write(fd:int, bufPtr:int, nbyte:int, errnoPtr:int):int {
-        var str:String = CModule.readString(bufPtr, nbyte)
-        log(str)
-        return nbyte
+    private function onProgress(e:Event):void
+    {
     }
 
     /**
-     * libVGL expects to be able to read Keyboard input from
-     * file descriptor zero using normal C IO.
-     */
-    public function read(fd:int, bufPtr:int, nbyte:int, errnoPtr:int):int {
-        if (fd == 0 && nbyte == 1) {
-            _keyBA.position = _kp++
-            if (_keyBA.bytesAvailable) {
-                CModule.write8(bufPtr, _keyBA.readUnsignedByte())
-                return 1
-            } else {
-                _keyBA.length = 0
-                _keyBA.position = 0
-                _kp = 0
-            }
+    * All of the real FlasCC init happens in this method
+    * which is either run on startup or once the SWF has
+    * been added to the stage.
+    */
+    protected function init(e:Event):void
+    {
+      try {
+        CModule.vfs.addBackingStore(new myfs(), null)
+      } catch(e:*) {
+        // a zip based fs wasn't supplied
+      }
+      
+      inputContainer = new Sprite()
+      addChild(inputContainer)
+
+      stage.align = StageAlign.TOP_LEFT;
+      stage.scaleMode = StageScaleMode.NO_SCALE;
+      stage.addEventListener(KeyboardEvent.KEY_DOWN, bufferKeyDown);
+      stage.addEventListener(KeyboardEvent.KEY_UP, bufferKeyUp);
+      stage.addEventListener(MouseEvent.MOUSE_MOVE, bufferMouseMove);
+      stage.addEventListener(MouseEvent.MOUSE_DOWN, bufferMouseDown);
+      stage.addEventListener(MouseEvent.MOUSE_UP, bufferMouseUp);
+      stage.frameRate = 60;
+      stage.scaleMode = StageScaleMode.NO_SCALE;
+
+      if(enableConsole) {
+      _tf = new TextField;
+      _tf.multiline = true;
+      _tf.width = _width;
+      _tf.height = _height;
+      inputContainer.addChild(_tf);
+      }
+    
+    _stage = stage.stage3Ds[0];
+    _stage.addEventListener(Event.CONTEXT3D_CREATE, context_created);
+    //_stage.requestContext3D(Context3DRenderMode.AUTO);
+    _stage.requestContext3D("auto");
+  }
+
+  private function context_created(e:Event):void
+  {
+      _context = _stage.context3D;
+      _context.configureBackBuffer(_width, _height, 4, true /*enableDepthAndStencil*/ );
+      _context.enableErrorChecking = true;
+      
+      trace(_context.driverInfo);
+      GLAPI.init(_context, null, stage);
+      var gl:GLAPI = GLAPI.instance;
+      gl.context.clear(0.0, 0.0, 0.0);
+      gl.context.present();
+      gl.context.clear(0.0, 0.0, 0.0);
+      this.addEventListener(Event.ENTER_FRAME, runMain);
+      stage.addEventListener(Event.RESIZE, stageResize);
+    }
+    
+    private function stageResize(event:Event):void
+    {
+        // need to reconfigure back buffer
+        _width = stage.stageWidth;
+        _height = stage.stageHeight;
+        _context.configureBackBuffer(_width, _height, 4, true /*enableDepthAndStencil*/ );
+    }
+
+    private function runMain(event:Event):void
+    {
+      this.removeEventListener(Event.ENTER_FRAME, runMain);
+      var argv:Vector.<String> = new Vector.<String>();
+      argv.push("/data/neverball.swf");
+      
+      // change to false to prevent running main in the background
+      // when Workers are supported
+      const runMainBg:Boolean = true
+
+      // PlayerKernel will delegate read/write requests to the "/dev/tty"
+      // file to the object specified with this API.
+      CModule.vfs.console = this
+      
+      try {
+        CModule.vfs.addBackingStore(new myfs(), null)
+      } catch(e:*) {
+        // a zip based fs wasn't supplied
+        trace("No fs supplied...");
+      }
+
+      CModule.startAsync(this, argv);
+      mainloopTickPtr = CModule.getPublicSymbol("glutMainLoopBody");
+      keyHandlerPtr = CModule.getPublicSymbol("_avm2_glut_keyhandler");
+
+      enterFrame(null);
+      addEventListener(Event.ENTER_FRAME, enterFrame);
+    }
+
+    /**
+    * The PlayerKernel implementation will use this function to handle
+    * C IO write requests to the file "/dev/tty" (e.g. output from
+    * printf will pass through this function). See the ISpecialFile
+    * documentation for more information about the arguments and return value.
+    */
+    public function write(fd:int, bufPtr:int, nbyte:int, errnoPtr:int):int
+    {
+      var str:String = CModule.readString(bufPtr, nbyte)
+      consoleWrite(str)
+      return nbyte
+    }
+
+    /**
+    * The PlayerKernel implementation uses this function to handle
+    * C IO read requests to the file "/dev/tty" (for example, reads from stdin
+    * will expect this function to provide the data). See the ISpecialFile
+    * documentation for more information about the arguments and return value.
+    */
+    public function read(fd:int, bufPtr:int, nbyte:int, errnoPtr:int):int
+    {
+      if(fd == 0 && nbyte == 1) {
+        keybytes.position = kp++
+        if(keybytes.bytesAvailable) {
+          CModule.write8(bufPtr, keybytes.readUnsignedByte())
+          return 1
+        } else {
+          keybytes.length = 0
+          keybytes.position = 0
+          kp = 0
         }
-        return 0
+      }
+      return 0
+    }
+    
+    /**
+    * The PlayerKernel implementation will use this function to handle
+    * C fcntl requests to the file "/dev/tty" 
+    * See the ISpecialFile documentation for more information about the
+    * arguments and return value.
+    */
+    public function fcntl(fd:int, com:int, data:int, errnoPtr:int):int
+    {
+      return 0
+    }
+    
+    /**
+    * The PlayerKernel implementation will use this function to handle
+    * C ioctl requests to the file "/dev/tty" 
+    * See the ISpecialFile documentation for more information about the
+    * arguments and return value.
+    */
+    public function ioctl(fd:int, com:int, data:int, errnoPtr:int):int
+    {
+      return 0;
     }
 
-    public function fcntl(fd:int, com:int, data:int, errnoPtr:int):int {
-        return 0
+    public function bufferMouseMove(me:MouseEvent) {
+      me.stopPropagation()
+      mx = me.stageX
+      my = me.stageY
+    }
+    
+    public function bufferMouseDown(me:MouseEvent) 
+    {
+      me.stopPropagation();
+      mx = me.stageX;
+      my = me.stageY;
+      button = 1;
+    }
+    
+    public function bufferMouseUp(me:MouseEvent) 
+    {
+      me.stopPropagation();
+      mx = me.stageX;
+      my = me.stageY;
+      button = 0;
     }
 
-    public function ioctl(fd:int, com:int, data:int, errnoPtr:int):int {
-        _vglttyargs[0] = fd
-        _vglttyargs[1] = com
-        _vglttyargs[2] = data
-        _vglttyargs[3] = errnoPtr
-        return CModule.callI(CModule.getPublicSymbol("vglttyioctl"), _vglttyargs);
+    private var keyhandlerargs:Vector.<int> = new Vector.<int>(3);
+
+    public function bufferKeyDown(ke:KeyboardEvent) 
+    {
+      ke.stopPropagation();
+
+      keyhandlerargs[0] = ke.keyCode;
+      keyhandlerargs[1] = 1;
+      keyhandlerargs[2] = mx;
+      keyhandlerargs[3] = my;
+      CModule.callI(keyHandlerPtr, keyhandlerargs);
+    }
+    
+    public function bufferKeyUp(ke:KeyboardEvent) 
+    {
+      ke.stopPropagation();
+
+      keyhandlerargs[0] = ke.keyCode;
+      keyhandlerargs[1] = 0;
+      keyhandlerargs[2] = mx;
+      keyhandlerargs[3] = my;
+      CModule.callI(keyHandlerPtr, keyhandlerargs);
     }
 
-    // HELPERS
-
-    private function log(message:String):void {
-        trace(message);
-        if (_textField) {
-            _textField.appendText(message + "\n");
-            _textField.scrollV = _textField.maxScrollV;
-        }
+    /**
+    * Helper function that traces to the flashlog text file and also
+    * displays output in the on-screen textfield console.
+    */
+    protected function consoleWrite(s:String):void
+    {
+      trace(s)
+      if(enableConsole) {
+        _tf.appendText(s)
+        _tf.scrollV = _tf.maxScrollV
+      }
     }
 
-}
+    /**
+    * The enterFrame callback will be run once every frame. UI thunk requests should be handled
+    * here by calling CModule.serviceUIRequests() (see CModule ASdocs for more information on the UI thunking functionality).
+    */
+    protected function enterFrame(e:Event):void
+    {
+      CModule.serviceUIRequests()
+      var gl:GLAPI = GLAPI.instance;
+      CModule.callI(mainloopTickPtr, new Vector.<int>());
+      gl.context.present();
+      gl.context.clear(1.0, 0.0, 0.0);
+    }
+  }
 }

@@ -28,16 +28,16 @@
 
 .PHONY: init clean all 
 
-$?VGL_TARGETS=	lesson02 lesson03 lesson04 lesson05 lesson06 lesson07 lesson08 lesson09 lesson10 lesson11 lesson12 lesson13 lesson21 lesson22 lesson23 lesson24 lesson25 lesson32 lesson36 lesson37 lesson40 lesson41 lesson42 lesson43 lesson45 lesson47 
+$?VGL_TARGETS=	NeHeLesson01 NeHeLesson02 NeHeLesson03 NeHeLesson04 NeHeLesson05 NeHeLesson06 NeHeLesson07 NeHeLesson08 NeHeLesson11 NeHeLesson12 NeHeLesson19
  
 all: clean init check $(VGL_TARGETS)
  
 %:
 	# Generate VFS
 	@rm -rf lessons/$@/temp/
-	@mkdir -p lessons/$@/fs/
+	@mkdir -p lessons/$@/vfs/
 	@mkdir -p lessons/$@/temp/
-	"$(FLASCC)/usr/bin/genfs" lessons/$@/fs/ --name=myfs --type=embed lessons/$@/temp/ttt
+	"$(FLASCC)/usr/bin/genfs" lessons/$@/vfs/ --name=myfs --type=embed lessons/$@/temp/ttt
 	# Compile VFS
 	# TODO
 	$(ASC2) -AS3 -optimize -strict \
@@ -70,7 +70,7 @@ all: clean init check $(VGL_TARGETS)
 	#"$(FLASCC)/usr/bin/g++" -O4 -c lessons/$@/$@.cpp
 	#"$(FLASCC)/usr/bin/nm" $@.o | grep " T " | awk '{print $$3}' | sed 's/__/_/' >> exports-$@.txt 
 	# Generate Main.SWF
-	"$(FLASCC)/usr/bin/g++" $(BASE_CFLAGS) $(wildcard lessons/$@/*.cpp) $(GLS3D)/install/usr/lib/libGL.abc lessons/$@/myfs.abc -symbol-abc=lessons/$@/Console.abc \
+	"$(FLASCC)/usr/bin/g++" $(BASE_CFLAGS) $(wildcard lessons/$@/*.cpp) $(wildcard lessons/$@/*.c) $(GLS3D)/install/usr/lib/libGL.abc lessons/$@/myfs.abc -symbol-abc=lessons/$@/Console.abc \
 		-I$(GLS3D)/install/usr/include/ -L$(GLS3D)/install/usr/lib/ \
 		-I$(FLASCC)/../samples/Example_freeglut/install/usr/include/ -L$(FLASCC)/../samples/Example_freeglut/install/usr/lib/ \
 		-lSDL -lSDL_image -lSDL_mixer -lSDL_ttf -lglut -lGL -lvgl -lfreetype -lvorbis -logg -lwebp -ltiff -lpng -lz -ljpeg -lm  \
