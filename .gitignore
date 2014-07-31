@@ -1,0 +1,11 @@
+*.abc
+*.bc
+*.swf
+*.swc
+*.exe
+*.zip
+*.ipr
+*.iml
+*.iws
+temp/
+bin/
