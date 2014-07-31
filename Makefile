@@ -28,9 +28,9 @@
 
 .PHONY: init clean all 
 
-$?VGL_TARGETS=	NeHeLesson01 NeHeLesson02 NeHeLesson03 NeHeLesson04 NeHeLesson05 NeHeLesson06 NeHeLesson07 NeHeLesson08 NeHeLesson11 NeHeLesson12 NeHeLesson19
+$?VGL_TARGETS=	NeHeLesson01 NeHeLesson02 NeHeLesson03 NeHeLesson04 NeHeLesson05 NeHeLesson06 NeHeLesson07 NeHeLesson08 test_shapes test_fractals
  
-all: clean init check $(VGL_TARGETS)
+all: clean check $(VGL_TARGETS)
  
 %:
 	# Generate VFS
